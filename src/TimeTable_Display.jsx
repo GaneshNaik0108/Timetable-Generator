@@ -4,22 +4,147 @@ import GetData from './GetData';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
+// Helper function to convert time
+const convertTime = (hours, minutes) => {
+  // Normalize hours and minutes
+  let normalizedHours = hours;
+  let normalizedMinutes = minutes;
+  // Handle minute overflow
+  if (normalizedMinutes >= 60) {
+    normalizedHours += Math.floor(normalizedMinutes / 60);
+    normalizedMinutes %= 60;
+  }
+  // Convert to 12-hour format
+  let period = 'AM';
+  if (normalizedHours >= 12) {
+    period = 'PM';
+    if (normalizedHours > 12) {
+      normalizedHours -= 12;
+    }
+  }
+  // Handle midnight/noon special cases
+  if (normalizedHours === 0) normalizedHours = 12;
+  // Format hours and minutes with leading zeros
+  const formattedHours = normalizedHours.toString().padStart(2, '0');
+  const formattedMinutes = normalizedMinutes.toString().padStart(2, '0');
+  return {
+    time: `${formattedHours}:${formattedMinutes} ${period}`,
+    hours: normalizedHours,
+    minutes: normalizedMinutes,
+    period
+  };
+};
+
 const TimeTableDisplay = () => {
   const [timeTableData, setTimeTableData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [refreshKey, setRefreshKey] = useState(0); // For forcing re-renders
-  const divisionRefs = useRef([]); // References for each division
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [timeSlots, setTimeSlots] = useState([]);
+  const divisionRefs = useRef([]); 
+
+  // PDF Download Handler
+  const handleDownloadPDF = () => {
+    if (!divisionRefs.current || divisionRefs.current.length === 0) {
+      console.error('No division references found');
+      return;
+    }
+
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = pdf.internal.pageSize.getHeight();
+
+    divisionRefs.current.forEach((divRef, index) => {
+      if (divRef) {
+        html2canvas(divRef, { 
+          scale: 2, 
+          useCORS: true 
+        }).then(canvas => {
+          const imgData = canvas.toDataURL('image/png');
+          const imgProps = pdf.getImageProperties(imgData);
+          const pdfImageWidth = pdfWidth - 20; // Margin
+          const pdfImageHeight = (imgProps.height * pdfImageWidth) / imgProps.width;
+
+          // Add page if not first division
+          if (index > 0) {
+            pdf.addPage();
+          }
+
+          pdf.addImage(
+            imgData, 
+            'PNG', 
+            10, // X coordinate 
+            10, // Y coordinate
+            pdfImageWidth, 
+            pdfImageHeight
+          );
+        });
+      }
+    });
+
+    // Slight delay to ensure all canvases are processed
+    setTimeout(() => {
+      pdf.save(`Timetable_${new Date().toISOString().slice(0,10)}.pdf`);
+    }, 1000);
+  };
+
+  useEffect(() => {
+    const generateTimeSlots = () => {
+      const startTime = GetData.StartTime || '09:00';
+      const lectureDuration = 60; // 1 hour lectures
+      const lunchDuration = 60; // 1 hour lunch break
+      
+      // Parse start time
+      const [startHours, startMinutes] = startTime.split(':').map(Number);
+      
+      const slots = [];
+      let currentHours = startHours;
+      let currentMinutes = startMinutes;
+      
+      // Generate time slots
+      for (let i = 0; i < 7; i++) {
+        // If it's the 4th iteration (middle of the day), insert lunch break
+        if (i === 3) {
+          // Calculate lunch start and end times
+          const lunchStartTime = convertTime(currentHours, currentMinutes);
+          const lunchEndTime = convertTime(currentHours, currentMinutes + lunchDuration);
+          
+          const timeSlotLabel = `Lunch & Break (${lunchStartTime.time}-${lunchEndTime.time})`;
+          slots.push(timeSlotLabel);
+          
+          // Move time forward by lunch duration
+          currentMinutes += lunchDuration;
+        } else {
+          // Calculate lecture end time (1 hour duration)
+          let endHours = currentHours;
+          let endMinutes = currentMinutes + lectureDuration;
+          
+          // Convert current and end times
+          const startTimeObj = convertTime(currentHours, currentMinutes);
+          const endTimeObj = convertTime(endHours, endMinutes);
+          
+          const timeSlotLabel = `${startTimeObj.time}-${endTimeObj.time}`;
+          slots.push(timeSlotLabel);
+          
+          // Prepare for next slot
+          currentMinutes = endMinutes;
+        }
+        
+        // Normalize hours and minutes
+        currentHours += Math.floor(currentMinutes / 60);
+        currentMinutes %= 60;
+      }
+      return slots;
+    };
+
+    // Set time slots when component mounts
+    const dynamicTimeSlots = generateTimeSlots();
+    setTimeSlots(dynamicTimeSlots);
+  }, [refreshKey]);
 
   useEffect(() => {
     generateTimetable();
-  }, [refreshKey]);
-
-  // Properly initialize division refs when division count changes
-  useEffect(() => {
-    const divCount = GetData.Divisiondata() || 3;
-    divisionRefs.current = Array(divCount).fill().map((_, i) => divisionRefs.current[i] || React.createRef());
-  }, [timeTableData]);
+  }, [timeSlots]); // Regenerate when time slots change
 
   const generateTimetable = () => {
     try {
@@ -27,10 +152,9 @@ const TimeTableDisplay = () => {
       setError(null);
       console.log("Initializing timetable generation");
       
-      // Make sure we have some default values if not set
+      // Ensure we have valid inputs
       if (GetData.NoDivision <= 0) {
         GetData.NoDivision = 3;
-        GetData.updateTimeTableDimensions();
         console.log("Set default division count:", GetData.NoDivision);
       }
       
@@ -65,161 +189,10 @@ const TimeTableDisplay = () => {
     setRefreshKey(prevKey => prevKey + 1);
   };
 
-  // Handle PDF download - individual division approach
-// Replace the entire handleDownloadPDF function with this improved version
-const handleDownloadPDF = async () => {
-  if (!timeTableData || isLoading) {
-    alert('Please wait for the timetable to finish loading');
-    return;
-  }
-
-  // Show loading message
-  const loadingIndicator = document.createElement('div');
-  loadingIndicator.style.position = 'fixed';
-  loadingIndicator.style.top = '50%';
-  loadingIndicator.style.left = '50%';
-  loadingIndicator.style.transform = 'translate(-50%, -50%)';
-  loadingIndicator.style.padding = '20px';
-  loadingIndicator.style.background = 'rgba(0,0,0,0.7)';
-  loadingIndicator.style.color = 'white';
-  loadingIndicator.style.borderRadius = '5px';
-  loadingIndicator.style.zIndex = '9999';
-  loadingIndicator.textContent = 'Generating PDF, please wait...';
-  document.body.appendChild(loadingIndicator);
-
-  try {
-    const divCount = GetData.Divisiondata() || 3;
-    const title = GetData.Titledata() || 'Generated Timetable';
-    
-    // Create PDF in landscape orientation for better fit
-    const pdf = new jsPDF('l', 'mm', 'a4');
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = pdf.internal.pageSize.getHeight();
-    
-    // Add title to first page
-    pdf.setFontSize(16);
-    pdf.text(title, pdfWidth / 2, 10, { align: 'center' });
-    
-    // Generate one division per page in correct order
-    for (let i = 0; i < divCount; i++) {
-      // Get the division element by reference
-      const divElement = divisionRefs.current[i];
-      
-      if (!divElement) {
-        console.warn(`Division ref ${i+1} not available, skipping`);
-        continue;
-      }
-      
-      // Add new page for each division after first one
-      if (i > 0) {
-        pdf.addPage();
-        pdf.setFontSize(16);
-        pdf.text(title, pdfWidth / 2, 10, { align: 'center' });
-      }
-      
-      // Temporarily make the division visible if it's scrolled out of view
-      const originalPosition = divElement.style.position;
-      const originalTop = divElement.style.top;
-      const originalLeft = divElement.style.left;
-      const originalZIndex = divElement.style.zIndex;
-      const originalOpacity = divElement.style.opacity;
-      
-      // Make sure the element is visible when capturing
-      divElement.style.opacity = "1";
-      
-      // Additional preparation for the capture
-      const originalDisplay = divElement.style.display;
-      divElement.style.display = 'block';
-      
-      // Wait for any potential renders to complete
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      try {
-        // Use html2canvas with better settings
-        const canvas = await html2canvas(divElement, {
-          scale: 2, // Higher scale for better quality
-          useCORS: true,
-          allowTaint: true,
-          logging: false,
-          backgroundColor: '#ffffff', // Ensure white background
-          removeContainer: false,
-          // Ensure we capture all content
-          height: divElement.scrollHeight,
-          width: divElement.scrollWidth,
-          windowWidth: document.documentElement.offsetWidth,
-          windowHeight: document.documentElement.offsetHeight
-        });
-        
-        // Get the image data
-        const imgData = canvas.toDataURL('image/jpeg', 1.0);
-        
-        // Calculate dimensions with proper aspect ratio while preserving readability
-        const imgWidth = canvas.width;
-        const imgHeight = canvas.height;
-        
-        // Calculate ratio to fit on page with margins
-        const ratio = Math.min((pdfWidth - 20) / imgWidth, (pdfHeight - 40) / imgHeight);
-        
-        // Add division number subtitle
-        pdf.setFontSize(14);
-        pdf.text(`Division ${i+1}`, pdfWidth / 2, 20, { align: 'center' });
-        
-        // Position image centrally on page
-        const xPos = (pdfWidth - imgWidth * ratio) / 2;
-        const yPos = 30; // Below title and division number
-        
-        // Add the image
-        pdf.addImage(imgData, 'JPEG', xPos, yPos, imgWidth * ratio, imgHeight * ratio);
-        
-        // Add page number at bottom
-        pdf.setFontSize(10);
-        pdf.text(`Page ${i+1} of ${divCount}`, pdfWidth / 2, pdfHeight - 10, { align: 'center' });
-      } catch (err) {
-        console.error(`Error capturing division ${i+1}:`, err);
-        // Add error message to PDF
-        pdf.setFontSize(12);
-        pdf.setTextColor(255, 0, 0);
-        pdf.text(`Error capturing Division ${i+1}: ${err.message}`, 20, 50);
-        pdf.setTextColor(0, 0, 0);
-      }
-      
-      // Restore the original styles
-      divElement.style.position = originalPosition;
-      divElement.style.top = originalTop;
-      divElement.style.left = originalLeft;
-      divElement.style.zIndex = originalZIndex;
-      divElement.style.opacity = originalOpacity;
-      divElement.style.display = originalDisplay;
-    }
-    
-    // Add footer with date on the last page
-    pdf.setFontSize(10);
-    const dateText = `Generated on: ${new Date().toLocaleDateString()}`;
-    pdf.text(dateText, pdfWidth - 10, pdfHeight - 10, { align: 'right' });
-    
-    // Save the PDF
-    pdf.save(`${title.replace(/\s+/g, '_')}.pdf`);
-    
-  } catch (err) {
-    console.error("PDF generation failed:", err);
-    alert(`PDF generation failed: ${err.message}`);
-  } finally {
-    // Always remove loading indicator
-    if (document.body.contains(loadingIndicator)) {
-      document.body.removeChild(loadingIndicator);
-    }
-  }
-};
-
-
-  // Create the grid pane for a specific division
   const createGridPane = (divisionIndex) => {
     // Days array for column headers
     const days = ["Time", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-    
-    // Time slots array
-    const timeSlots = ["9:00-10:00", "10:00-11:00", "11:00-12:00", "12:00-12:30", "12:30-1:30", "1:30-2:30", "2:30-3:30"];
-    
+
     // Grid styles
     const gridStyle = {
       display: 'grid',
@@ -239,7 +212,7 @@ const handleDownloadPDF = async () => {
       alignItems: 'center',
       justifyContent: 'center',
       height: '100%',
-      whiteSpace: 'pre-line' // To preserve newlines in timetable entries
+      whiteSpace: 'pre-line'
     };
     
     // Header cell style
@@ -288,7 +261,7 @@ const handleDownloadPDF = async () => {
                   gridColumn: '1', 
                   gridRow: `${rowIndex + 2}`,
                   fontWeight: 'bold',
-                  backgroundColor: '#f0f0f0'
+                  backgroundColor: timeSlot.toLowerCase().includes('lunch & break') ? '#FFE6B3' : '#f0f0f0'
                 }}
               >
                 {timeSlot}
@@ -299,16 +272,14 @@ const handleDownloadPDF = async () => {
                 const day = colIndex + 1;
                 const period = rowIndex + 1;
                 
-                // Ensure we're accessing the right division's data
                 const cellContent = timeTableData[divisionIndex] && 
                                    timeTableData[divisionIndex][day] && 
                                    timeTableData[divisionIndex][day][period] || '';
                 
-                // Determine background color (special for lunch period)
                 let backgroundColor = '#ffffff';
                 if (cellContent) {
-                  if (period === 4) {
-                    backgroundColor = '#ffe6e6'; // Light red for lunch break
+                  if (timeSlot.toLowerCase().includes('lunch & break')) {
+                    backgroundColor = '#FFE6B3'; // Light orange for lunch & break
                   } else {
                     backgroundColor = '#e6f7ff'; // Light blue for normal classes
                   }
@@ -424,20 +395,17 @@ const handleDownloadPDF = async () => {
       }}>
         {/* Create multiple timetables based on division count in correct order */}
         {Array.from({ length: GetData.Divisiondata() || 3 }, (_, index) => {
-          // Use the current index to assign a reference
           return (
             <div 
               key={`division-${index}`}
               ref={el => divisionRefs.current[index] = el}
               style={{
                 marginBottom: '30px',
-                pageBreakInside: 'avoid', // Hint for PDF rendering
+                pageBreakInside: 'avoid',
                 backgroundColor: 'white',
                 padding: '10px'
               }}
-              // Continuation of the TimeTableDisplay component AFTER THIS LINE 
             >
-            
               <h2 style={{ fontSize: '20px', marginBottom: '15px' }}>
                 Division {index + 1}
               </h2>

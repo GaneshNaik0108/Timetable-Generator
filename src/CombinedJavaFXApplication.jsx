@@ -61,207 +61,280 @@ const CombinedJavaFXApplication = () => {
   // Handle division count change
   const handleDivisionChange = (e) => {
     const value = parseInt(e.target.value, 10);
-    if (value > 0) {
+    if (value > 0 && value <= 10) {
       setDivisionCount(value);
     }
   };
   
+  // Enhanced validation method
+  const validateInputs = () => {
+    const errors = [];
+
+    // Validate title
+    if (!title.trim()) {
+      errors.push("Timetable title cannot be empty");
+    }
+
+    // Validate division count
+    if (divisionCount < 1 || divisionCount > 10) {
+      errors.push("Number of divisions must be between 1 and 10");
+    }
+
+    // Validate unique teacher names
+    const uniqueTeachers = new Set(teacherInputs.filter(t => t.trim() !== ""));
+    if (uniqueTeachers.size !== teacherInputs.filter(t => t.trim() !== "").length) {
+      errors.push("Teacher names must be unique");
+    }
+
+    // Validate unique subject names
+    const uniqueSubjects = new Set(subjectInputs.filter(s => s.trim() !== ""));
+    if (uniqueSubjects.size !== subjectInputs.filter(s => s.trim() !== "").length) {
+      errors.push("Subject names must be unique");
+    }
+
+    return errors;
+  };
+  
   // Handle next button click
- // In CombinedJavaFXApplication.jsx, update the handleNextClick function:
+  const handleNextClick = () => {
+    try {
+      // Validate inputs before proceeding
+      const validationErrors = validateInputs();
+      if (validationErrors.length > 0) {
+        setError(validationErrors.join(". "));
+        return;
+      }
 
-// Replace only the handleNextClick function in CombinedJavaFXApplication.jsx:
-
-const handleNextClick = () => {
-  try {
-    setError(null);
-    
-    // Update configuration
-    GetData.Title = title;  
-    GetData.NoDivision = divisionCount;
-    GetData.NoTeacher = teacherCount;
-    GetData.updateTimeTableDimensions();
-    
-    // Store teacher names (filter out empty ones, but keep at least the filled ones)
-    const filteredTeachers = teacherInputs.filter(t => t.trim() !== "");
-    GetData.TotalTeacher = filteredTeachers.length > 0 ? 
-      filteredTeachers : 
-      Array(teacherCount).fill().map((_, i) => `Teacher ${i+1}`);
-    
-    // Store subject names (same filtering logic)
-    const filteredSubjects = subjectInputs.filter(s => s.trim() !== "");
-    GetData.TotalSubject = filteredSubjects.length > 0 ? 
-      filteredSubjects : 
-      Array(teacherCount).fill().map((_, i) => `Subject ${i+1}`);
-    
-    console.log("Configuration saved:");
-    console.log("- Title:", GetData.Title);
-    console.log("- Divisions:", GetData.NoDivision);
-    console.log("- Teachers:", GetData.TotalTeacher);
-    console.log("- Subjects:", GetData.TotalSubject);
-    
-    // This must match EXACTLY with the Route path in App.js
-    navigate('/TimeTableDisplay');
-    
-    // If that doesn't work, try one of these alternatives:
-    // navigate('/timetable');
-    // navigate('/TimeTable_Display');
-  } catch (err) {
-    console.error("Error preparing timetable data:", err);
-    setError(`Failed to prepare timetable data: ${err.message}`);
-  }
-};
+      setError(null);
+      
+      // Update configuration
+      GetData.Title = title;  
+      GetData.NoDivision = divisionCount;
+      GetData.NoTeacher = teacherCount;
+      GetData.updateTimeTableDimensions();
+      
+      // Store teacher names (filter out empty ones, but keep at least the filled ones)
+      const filteredTeachers = teacherInputs.filter(t => t.trim() !== "");
+      GetData.TotalTeacher = filteredTeachers.length > 0 ? 
+        filteredTeachers : 
+        Array(teacherCount).fill().map((_, i) => `Teacher ${i+1}`);
+      
+      // Store subject names (same filtering logic)
+      const filteredSubjects = subjectInputs.filter(s => s.trim() !== "");
+      GetData.TotalSubject = filteredSubjects.length > 0 ? 
+        filteredSubjects : 
+        Array(teacherCount).fill().map((_, i) => `Subject ${i+1}`);
+      
+      console.log("Configuration saved:");
+      console.log("- Title:", GetData.Title);
+      console.log("- Divisions:", GetData.NoDivision);
+      console.log("- Teachers:", GetData.TotalTeacher);
+      console.log("- Subjects:", GetData.TotalSubject);
+      
+      // This must match EXACTLY with the Route path in App.js
+      navigate('/TimeTableDisplay');
+    } catch (err) {
+      console.error("Error preparing timetable data:", err);
+      setError(`Failed to prepare timetable data: ${err.message}`);
+    }
+  };
+  
+  // Rest of the component remains the same...
   
   return (
-    <div style={{ 
-      width: '900px', 
-      height: '100%', 
-      position: 'relative', 
-      margin: '0 auto',
-      padding: '20px',
-      fontFamily: 'Arial, sans-serif'
-    }}>
-      <h1 style={{ textAlign: 'center', marginTop: '10px' }}>Timetable Generator</h1>
-      
-      {/* Error message */}
-      {error && (
-        <div style={{
-          margin: '10px 0',
-          padding: '10px',
-          backgroundColor: '#ffebee',
-          border: '1px solid #ffcdd2',
-          borderRadius: '4px',
-          color: '#d32f2f'
-        }}>
-          {error}
-        </div>
-      )}
-      
-      {/* Configuration options */}
       <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        marginBottom: '30px',
-        padding: '0 60px'
+        maxWidth: '1200px', 
+        width: '95%',
+        margin: '0 auto',
+        padding: '20px',
+        fontFamily: 'Arial, sans-serif',
+        boxSizing: 'border-box'
       }}>
-        <div>
-          <label style={{ display: 'block', marginBottom: '5px' }}>Timetable Title:</label>
-          <input
-            type="text"
-            value={title}
-            onChange={handleTitleChange}
-            style={{
-              width: '300px',
-              height: '34px',
-              padding: '0 5px',
-              border: '1px solid #ccc',
-              borderRadius: '3px'
-            }}
-          />
+        <h1 style={{ 
+          textAlign: 'center', 
+          marginBottom: '30px',
+          color: '#333',
+          fontSize: '2rem'
+        }}>
+          Timetable Generator
+        </h1>
+        
+        {/* Error message */}
+        {error && (
+          <div style={{
+            margin: '10px 0',
+            padding: '15px',
+            backgroundColor: '#ffebee',
+            border: '1px solid #ffcdd2',
+            borderRadius: '5px',
+            color: '#d32f2f',
+            textAlign: 'center'
+          }}>
+            {error}
+          </div>
+        )}
+        
+        {/* Configuration options */}
+        <div style={{ 
+          display: 'flex', 
+          flexWrap: 'wrap',
+          justifyContent: 'space-between', 
+          marginBottom: '30px',
+          gap: '15px'
+        }}>
+          <div style={{ flex: '1 1 300px', minWidth: '250px' }}>
+            <label style={{ 
+              display: 'block', 
+              marginBottom: '10px',
+              fontWeight: 'bold',
+              color: '#555'
+            }}>
+              Timetable Title:
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={handleTitleChange}
+              style={{
+                width: '100%',
+                height: '40px',
+                padding: '0 10px',
+                border: '1px solid #ccc',
+                borderRadius: '5px',
+                fontSize: '16px'
+              }}
+            />
+          </div>
+          
+          <div style={{ flex: '1 1 200px', minWidth: '200px' }}>
+            <label style={{ 
+              display: 'block', 
+              marginBottom: '10px',
+              fontWeight: 'bold',
+              color: '#555'
+            }}>
+              Number of Divisions:
+            </label>
+            <input
+              type="number"
+              min="1"
+              max="10"
+              value={divisionCount}
+              onChange={handleDivisionChange}
+              style={{
+                width: '100%',
+                height: '40px',
+                padding: '0 10px',
+                border: '1px solid #ccc',
+                borderRadius: '5px',
+                fontSize: '16px'
+              }}
+            />
+          </div>
         </div>
         
-        <div>
-          <label style={{ display: 'block', marginBottom: '5px' }}>Number of Divisions:</label>
-          <input
-            type="number"
-            min="1"
-            max="10"
-            value={divisionCount}
-            onChange={handleDivisionChange}
+        {/* Teacher and Subject Inputs */}
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '20px',
+          justifyContent: 'space-between'
+        }}>
+          {/* Teacher Names Column */}
+          <div style={{ 
+            flex: '1 1 45%', 
+            minWidth: '300px',
+            marginBottom: '20px'
+          }}>
+            <h2 style={{ 
+              marginBottom: '15px', 
+              textAlign: 'center',
+              color: '#333',
+              fontSize: '1.2rem'
+            }}>
+              Enter Teacher Names
+            </h2>
+            {Array.from({ length: teacherCount }).map((_, i) => (
+              <input
+                key={`teacher-${i}`}
+                type="text"
+                value={teacherInputs[i]}
+                onChange={(e) => handleTeacherChange(i, e.target.value)}
+                placeholder={`Teacher ${i+1}`}
+                style={{
+                  width: '100%',
+                  height: '40px',
+                  marginBottom: '10px',
+                  padding: '0 10px',
+                  border: '1px solid #ccc',
+                  borderRadius: '5px',
+                  fontSize: '16px'
+                }}
+              />
+            ))}
+          </div>
+          
+          {/* Subject Names Column */}
+          <div style={{ 
+            flex: '1 1 45%', 
+            minWidth: '300px',
+            marginBottom: '20px'
+          }}>
+            <h2 style={{ 
+              marginBottom: '15px', 
+              textAlign: 'center',
+              color: '#333',
+              fontSize: '1.2rem'
+            }}>
+              Enter Subject Names
+            </h2>
+            {Array.from({ length: teacherCount }).map((_, i) => (
+              <input
+                key={`subject-${i}`}
+                type="text"
+                value={subjectInputs[i]}
+                onChange={(e) => handleSubjectChange(i, e.target.value)}
+                placeholder={`Subject ${i+1}`}
+                style={{
+                  width: '100%',
+                  height: '40px',
+                  marginBottom: '10px',
+                  padding: '0 10px',
+                  border: '1px solid #ccc',
+                  borderRadius: '5px',
+                  fontSize: '16px'
+                }}
+              />
+            ))}
+          </div>
+        </div>
+        
+        {/* Next button */}
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          marginTop: '20px' 
+        }}>
+          <button
+            onClick={handleNextClick}
             style={{
-              width: '150px',
-              height: '34px',
-              padding: '0 5px',
-              border: '1px solid #ccc',
-              borderRadius: '3px'
+              padding: '12px 40px',
+              fontSize: '18px',
+              cursor: 'pointer',
+              backgroundColor: '#4caf50',
+              color: 'white',
+              border: 'none',
+              borderRadius: '5px',
+              transition: 'background-color 0.3s ease'
             }}
-          />
+            onMouseOver={(e) => e.target.style.backgroundColor = '#45a049'}
+            onMouseOut={(e) => e.target.style.backgroundColor = '#4caf50'}
+          >
+            Generate Timetable
+          </button>
         </div>
       </div>
-      
-      {/* Teacher inputs section */}
-      <div>
-        <label style={{ 
-          position: 'absolute', 
-          left: '60px', 
-          top: '142px', 
-          fontSize: '18px'
-        }}>
-          Enter the Name of Teacher
-        </label>
-        
-        {Array.from({ length: teacherCount }).map((_, i) => (
-          <input
-            key={`teacher-${i}`}
-            type="text"
-            value={teacherInputs[i]}
-            onChange={(e) => handleTeacherChange(i, e.target.value)}
-            placeholder={`Teacher ${i+1}`}
-            style={{
-              position: 'absolute',
-              left: '60px',
-              top: `${165 + i * 45}px`,
-              width: '300px',
-              height: '34px',
-              padding: '0 5px',
-              border: '1px solid #ccc',
-              borderRadius: '3px'
-            }}
-          />
-        ))}
-      </div>
-      
-      {/* Subject inputs section */}
-      <div>
-        <label style={{ 
-          position: 'absolute', 
-          left: '473px', 
-          top: '142px', 
-          fontSize: '18px'
-        }}>
-          Enter Subject Name
-        </label>
-        
-        {Array.from({ length: teacherCount }).map((_, i) => (
-          <input
-            key={`subject-${i}`}
-            type="text"
-            value={subjectInputs[i]}
-            onChange={(e) => handleSubjectChange(i, e.target.value)}
-            placeholder={`Subject ${i+1}`}
-            style={{
-              position: 'absolute',
-              left: '450px',
-              top: `${165 + i * 45}px`,
-              width: '300px',
-              height: '34px',
-              padding: '0 5px',
-              border: '1px solid #ccc',
-              borderRadius: '3px'
-            }}
-          />
-        ))}
-      </div>
-      
-      {/* Next button */}
-      <button
-        onClick={handleNextClick}
-        style={{
-          position: 'absolute',
-          left: '374px',
-          top: `${165 + teacherCount * 45 + 50}px`,
-          padding: '10px 30px',
-          fontSize: '16px',
-          cursor: 'pointer',
-          backgroundColor: '#4caf50',
-          color: 'white',
-          border: 'none',
-          borderRadius: '4px'
-        }}
-      >
-        Generate Timetable
-      </button>
-    </div>
-  );
-};
+    );
+  };
 
 export default CombinedJavaFXApplication;

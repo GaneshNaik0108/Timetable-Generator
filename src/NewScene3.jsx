@@ -10,67 +10,51 @@ const NewScene3 = () => {
   
   useEffect(() => {
     // Initialize break inputs based on the number of breaks from GetData
-    const numberOfBreaks = GetData.GiveBreaksdata();
+    const numberOfBreaks = GetData.NoBreaks; // Use the breaks number from GetData
     const initialBreakInputs = Array(numberOfBreaks).fill('');
     setBreakInputs(initialBreakInputs);
   }, []);
 
   const handleNext = () => {
-    // Save time data to GetData if needed
-    // Here you could add the code to save the time data
-    
-    // Navigate to CombinedJavaFXApplication
-    console.log("Navigating to CombinedJavaFXApplication");
-    console.log("Time data:", { startTime, endTime, breakInputs });
-    
+    // Comprehensive validation
+    const errors = [];
+
+    // Validate start and end times
+    if (!startTime) {
+      errors.push('Please enter a start time');
+    }
+
+    if (!endTime) {
+      errors.push('Please enter an end time');
+    }
+
+    // Validate break times
+    const invalidBreaks = breakInputs.some(breakTime => 
+      !breakTime.trim() || !breakTime.match(/^\d{2}:\d{2}-\d{2}:\d{2}$/)
+    );
+
+    if (invalidBreaks) {
+      errors.push('Please enter all break times in HH:MM-HH:MM format');
+    }
+
+    // Display errors if any
+    if (errors.length > 0) {
+      alert(errors.join('\n'));
+      return;
+    }
+
+    // Save data to GetData
+    GetData.StartTime = startTime;
+    GetData.EndTime = endTime;
+    GetData.BreakTimes = breakInputs;
+
+    console.log("Time data:", { 
+      startTime: GetData.StartTime, 
+      endTime: GetData.EndTime, 
+      breakTimes: GetData.BreakTimes 
+    });
+
     navigate('/combinedjavafxapplication');
-  };
-
-  // Styles to match the JavaFX layout
-  const containerStyle = {
-    width: '756px',
-    height: '477px',
-    position: 'relative',
-    margin: '0 auto',
-    fontFamily: 'Arial, sans-serif',
-    backgroundColor: '#f0f0f0',
-    padding: '20px'
-  };
-
-  const labelStyle = {
-    fontSize: '18px',
-    position: 'absolute'
-  };
-
-  const headerLabelStyle = {
-    fontSize: '20px',
-    position: 'absolute',
-    left: '209px',
-    top: '28px',
-    width: '382px',
-    textDecoration: 'underline'
-  };
-
-  const inputStyle = {
-    position: 'absolute',
-    left: '217px',
-    width: '280px',
-    height: '30px',
-    padding: '0 5px',
-    border: '1px solid #ccc',
-    borderRadius: '3px'
-  };
-
-  const buttonStyle = {
-    position: 'absolute',
-    left: '345px',
-    top: '430px',
-    padding: '8px 20px',
-    fontSize: '16px',
-    cursor: 'pointer',
-    backgroundColor: '#e0e0e0',
-    border: '1px solid #ccc',
-    borderRadius: '4px'
   };
 
   const handleBreakInputChange = (index, value) => {
@@ -80,62 +64,144 @@ const NewScene3 = () => {
   };
 
   return (
-    <div style={containerStyle}>
-      <label style={headerLabelStyle}>Please Enter your Timings</label>
-      
-      <label style={{...labelStyle, left: '38px', top: '80px'}}> Starting Time :</label>
-      <input 
-        type="text" 
-        style={{...inputStyle, top: '80px'}} 
-        placeholder="e.g. 09:00"
-        value={startTime} 
-        onChange={(e) => setStartTime(e.target.value)} 
-      />
-      
-      <label style={{...labelStyle, left: '38px', top: '160px'}}>Enter the Ending Time</label>
-      <input 
-        type="text" 
-        style={{...inputStyle, top: '160px'}} 
-        placeholder="e.g. 17:00"
-        value={endTime} 
-        onChange={(e) => setEndTime(e.target.value)} 
-      />
-      
-      {/* Dynamic break inputs based on the number of breaks */}
-      {breakInputs.map((breakValue, index) => (
-        <React.Fragment key={`break-${index}`}>
+    <div style={{
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      minHeight: '100vh',
+      backgroundColor: '#f4f6f9',
+      fontFamily: 'Inter, Arial, sans-serif',
+      padding: '20px'
+    }}>
+      <div style={{
+        width: '100%',
+        maxWidth: '500px',
+        backgroundColor: 'white',
+        borderRadius: '12px',
+        boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
+        padding: '40px',
+        boxSizing: 'border-box'
+      }}>
+        <h2 style={{
+          textAlign: 'center',
+          color: '#2c3e50',
+          marginBottom: '30px',
+          fontSize: '24px',
+          borderBottom: '2px solid #3498db',
+          paddingBottom: '10px'
+        }}>
+          Timetable Timing Details
+        </h2>
+
+        <div style={{ marginBottom: '20px' }}>
           <label style={{
-            ...labelStyle, 
-            left: '38px', 
-            top: `${165 + (index + 1) * 45}px`
+            display: 'block',
+            marginBottom: '8px',
+            color: '#34495e',
+            fontWeight: '600'
           }}>
-            Break {index + 1}
+            Starting Time
           </label>
           <input 
-            type="text" 
+            type="time" 
             style={{
-              ...inputStyle, 
-              top: `${165 + (index + 1) * 45}px`
-            }} 
-            placeholder="e.g. 12:00-13:00"
-            value={breakValue} 
-            onChange={(e) => handleBreakInputChange(index, e.target.value)} 
+              width: '100%',
+              padding: '10px',
+              borderRadius: '6px',
+              border: '1px solid #bdc3c7',
+              fontSize: '16px',
+              transition: 'border-color 0.3s ease'
+            }}
+            value={startTime} 
+            onChange={(e) => setStartTime(e.target.value)} 
           />
-        </React.Fragment>
-      ))}
-      
-      <button 
-        style={buttonStyle} 
-        onClick={handleNext}
-        onMouseOver={(e) => {
-          e.target.style.backgroundColor = '#d0d0d0';
-        }}
-        onMouseOut={(e) => {
-          e.target.style.backgroundColor = '#e0e0e0';
-        }}
-      >
-        Next
-      </button>
+        </div>
+        
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{
+            display: 'block',
+            marginBottom: '8px',
+            color: '#34495e',
+            fontWeight: '600'
+          }}>
+            Ending Time
+          </label>
+          <input 
+            type="time" 
+            style={{
+              width: '100%',
+              padding: '10px',
+              borderRadius: '6px',
+              border: '1px solid #bdc3c7',
+              fontSize: '16px',
+              transition: 'border-color 0.3s ease'
+            }}
+            value={endTime} 
+            onChange={(e) => setEndTime(e.target.value)} 
+          />
+        </div>
+        
+        {/* Dynamic break inputs */}
+        {breakInputs.map((breakValue, index) => (
+          <div key={`break-${index}`} style={{ marginBottom: '20px' }}>
+            <label style={{
+              display: 'block',
+              marginBottom: '8px',
+              color: '#34495e',
+              fontWeight: '600'
+            }}>
+              Break {index + 1} Timing
+            </label>
+            <input 
+              type="text" 
+              placeholder="HH:MM-HH:MM (e.g. 12:00-13:00)"
+              style={{
+                width: '100%',
+                padding: '10px',
+                borderRadius: '6px',
+                border: '1px solid #bdc3c7',
+                fontSize: '16px',
+                transition: 'border-color 0.3s ease'
+              }}
+              value={breakValue} 
+              onChange={(e) => handleBreakInputChange(index, e.target.value)} 
+            />
+          </div>
+        ))}
+        
+        <div style={{
+          backgroundColor: '#f8f9fa',
+          padding: '15px',
+          borderRadius: '8px',
+          marginBottom: '20px',
+          textAlign: 'center',
+          color: '#2c3e50'
+        }}>
+          <p style={{ margin: 0, fontSize: '14px' }}>
+            Tip: Enter break times in HH:MM-HH:MM format
+          </p>
+        </div>
+        
+        <button 
+          style={{
+            width: '100%',
+            padding: '12px',
+            backgroundColor: '#3498db',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            fontSize: '18px',
+            cursor: 'pointer',
+            transition: 'background-color 0.3s ease',
+            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+          }} 
+          onClick={handleNext}
+          onMouseOver={(e) => e.target.style.backgroundColor = '#2980b9'}
+          onMouseOut={(e) => e.target.style.backgroundColor = '#3498db'}
+        >
+          Continue
+        </button>
+      </div>
     </div>
   );
 };
